@@ -1,0 +1,19 @@
+# Created by BaiJiFeiLong@gmail.com at 2021/12/28 10:59
+
+root = true
+
+[*]
+charset = utf-8
+indent_style = space
+indent_size = 4
+ij_continuation_indent_size = 8
+max_line_length = 120
+
+[*.py]
+ij_python_align_multiline_imports = false
+ij_python_align_multiline_parameters = false
+ij_python_align_multiline_parameters_in_calls = false
+ij_python_align_collections_and_comprehensions = false
+ij_python_use_continuation_indent_for_parameters = true
+ij_python_use_continuation_indent_for_arguments = false
+ij_python_use_continuation_indent_for_collection_and_comprehensions = false

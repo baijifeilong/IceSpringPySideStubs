@@ -1,0 +1,6 @@
+wheel
+typing-extensions==4.0.1
+colorlog==6.6.0
+PySide2==5.15.2
+
+
