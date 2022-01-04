@@ -8,6 +8,8 @@ import html2text
 from parsel import Selector
 from pathlib3x import Path
 
+docRoot = Path("~/scoop/persist/zeal/docsets/Qt_5.docset/Contents/Resources/Documents/doc.qt.io/qt-5").expanduser()
+assert docRoot.exists()
 Path("target").rmtree(ignore_errors=True)
 stubRoot = Path("target") / "PySide2Stubs"
 (stubRoot / "shiboken2").mkdir(parents=True, exist_ok=True)
@@ -24,7 +26,6 @@ mappings = [f"class {x}(object): ..." for x in "Virtual,Missing,Invalid,Default,
 
 gg = lambda x: x
 signalRegex = re.compile(r"^void (\w+)\(.*\)$")
-docRoot = Path("~/scoop/persist/zeal/docsets/Qt_5.docset/Contents/Resources/Documents/doc.qt.io/qt-5").expanduser()
 htmlDumper = html2text.HTML2Text()
 htmlDumper.ignore_links = True
 htmlDumper.ignore_emphasis = True
