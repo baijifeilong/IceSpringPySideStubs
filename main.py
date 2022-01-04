@@ -24,6 +24,44 @@ stubRoot = Path("target") / "PySide2Stubs"
 mappings = [f"class {x}(object): ..." for x in "Virtual,Missing,Invalid,Default,Instance".split(",")]
 (stubRoot / "PySide2" / "support" / "signature" / "mapping" / "__init__.pyi").write_text("\n".join(mappings))
 
+dumper = html2text.HTML2Text()
+dumper.ignore_tables = True
+dumper.body_width = 2 ** 31 - 1
+
+
+def parseFunctions(selector):
+    xpath = "//div[@class='prop' or @class='func']/*"
+    dkt = dict()
+    name = None
+    for x in selector.xpath(xpath):
+        tag = x.xpath("name()").get()
+        if tag == "h3":
+            name = x.attrib["id"]
+            dkt[name] = []
+        elif len(dkt):
+            assert name
+            dkt[name].append(dumper.handle(x.get()).strip())
+    return dkt
+
+
+def remove_prefix(text, prefix):
+    if text.startswith(prefix):
+        return text[len(prefix):]
+    return text  # or whatever
+
+
+def uncapitalize(s):
+    return s[:1].lower() + s[1:]
+
+
+def findDocInDict(dkt, name):
+    name2 = uncapitalize(remove_prefix(name, "set"))
+    for x in [name, name + "-prop", "name" + "-1", name2, name2 + "-prop"]:
+        if x in dkt:
+            return dkt[x]
+    return []
+
+
 gg = lambda x: x
 signalRegex = re.compile(r"^void (\w+)\(.*\)$")
 htmlDumper = html2text.HTML2Text()
@@ -41,6 +79,9 @@ class Dummy(object):
         ...
 """
 failed = []
+docXpath = "//h3/following-sibling::*[preceding-sibling::h3[1][{}] and not(self::h3)]"
+count = 0
+failures = []
 for moduleName in ["QtCore", "QtGui", "QtWidgets", "QtMultimedia"]:
     print(f"Processing module {moduleName}...")
     text = Path(f"./venv/Lib/site-packages/PySide2/{moduleName}.pyi").read_text()
@@ -63,27 +104,51 @@ for moduleName in ["QtCore", "QtGui", "QtWidgets", "QtMultimedia"]:
 
     isEnum = lambda clz: all([isinstance(x, ast.AnnAssign) for x in clz.body])
     for clazz in classes[:]:
-        print(f"Processing class {moduleName}.{clazz.name} (enum={isEnum(clazz)})...")
+        print(f"\nProcessing class {moduleName}.{clazz.name} (enum={isEnum(clazz)})...")
         path = stubRoot / "PySide2" / moduleName / f"_{clazz.name}.pyi"
         imports.append(f"from ._{clazz.name} import {clazz.name} as {clazz.name}")
-        if clazz.name.startswith("Q") and not isEnum(clazz):
-            basename = clazz.name.lower().replace("::", "-").replace("_", "-") + ".html"
-            if not (docRoot / basename).exists():
-                failed.append(clazz.name)
-                html = ""
-            else:
-                html = (docRoot / basename).read_text(encoding="utf8")
-            rows = Selector(html).xpath("//h2[@id='signals']/following-sibling::div[1]//tr")
-            for row in rows:
-                signature = htmlDumper.handle(row.get()).strip()
-                name = signalRegex.match(signature).group(1)
-                print("\tProcessing signal", name, "\t|\t", signature)
-                signalCode = signalTemplate.replace("signal", name).replace("signature", signature)
-                signalMethod = gg(ast.parse(signalCode).body[0]).body[0]
-                clazz.body.append(signalMethod)
-        path.write_text(astor.to_source(ast.Module(body=commons + [clazz])))
-    modulePyi.write_text("\n".join(imports))
+        basename = clazz.name.lower().replace("::", "-").replace("_", "-") + ".html"
+        if not (docRoot / basename).exists():
+            failed.append(clazz.name)
+            html = ""
+        else:
+            html = (docRoot / basename).read_text(encoding="utf8")
+        selector = Selector(html)
+        rows = selector.xpath("//h2[@id='signals']/following-sibling::div[1]//tr")
+        for row in rows:
+            signature = htmlDumper.handle(row.get()).strip()
+            name = signalRegex.match(signature).group(1)
+            print("\tSignal", name, "\t|\t", signature)
+            signalCode = signalTemplate.replace("signal", name).replace("signature", signature)
+            signalMethod = gg(ast.parse(signalCode).body[0]).body[0]
+            clazz.body.append(signalMethod)
+        methods = [x for x in clazz.body if isinstance(x, ast.FunctionDef)]
+        dkt = parseFunctions(selector)
+        for method in methods:
+            name = clazz.name if method.name == "__init__" else method.name
+            print(f"\n\tFunction {clazz.name}.{name}")
+            doc = findDocInDict(dkt, name)
+            print("\n".join([f"\t\t{x}" for x in doc if x]))
+            if doc:
+                doc = "\n\n".join(doc)
+                method.body.insert(0, ast.Expr(value=ast.Str(
+                    s="\n" + "\n\n".join(f"        {x}" for x in doc.splitlines() if x) + "\n        ")))
+            if html:
+                if not doc:
+                    count += 1
+                    print(str(docRoot / basename))
+                    failures.append(f"{clazz.name}.{name} {basename}")
+                    if count >= 2500:
+                        print()
+                        for failure in failures:
+                            print(failure)
+        path.write_text(astor.to_source(ast.Module(body=commons + [clazz])), encoding="utf8")
+        # html and exit()
+    modulePyi.write_text("\n".join(imports), encoding="utf8")
 
 print("Failed:")
 for x in failed:
+    print("\t", x)
+print("\nFailures:")
+for x in failures:
     print("\t", x)
