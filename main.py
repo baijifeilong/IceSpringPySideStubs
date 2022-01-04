@@ -6,7 +6,7 @@ import astor
 from pathlib3x import Path
 
 gg = lambda x: x
-Path("target").unlink(missing_ok=True)
+Path("target").rmtree(ignore_errors=True)
 root = Path("target") / "PySide2Stubs"
 (root / "shiboken2").mkdir(parents=True, exist_ok=True)
 (root / "shiboken2" / "__init__.pyi").write_text("class Object(object): ...")
@@ -17,7 +17,7 @@ root = Path("target") / "PySide2Stubs"
 (root / "PySide2" / "support" / "__init__.pyi").touch(exist_ok=True)
 (root / "PySide2" / "support" / "signature" / "__init__.pyi").touch(exist_ok=True)
 (root / "PySide2" / "support" / "signature" / "typing" / "__init__.pyi").touch(exist_ok=True)
-mappings = [f"class {x}(object):..." for x in "Virtual,Missing,Invalid,Default,Instance".split(",")]
+mappings = [f"class {x}(object): ..." for x in "Virtual,Missing,Invalid,Default,Instance".split(",")]
 (root / "PySide2" / "support" / "signature" / "mapping" / "__init__.pyi").write_text("\n".join(mappings))
 
 for moduleName in ["QtCore", "QtGui", "QtWidgets", "QtMultimedia"]:
@@ -29,6 +29,7 @@ for moduleName in ["QtCore", "QtGui", "QtWidgets", "QtMultimedia"]:
     classes = [x for x in nodes if isinstance(x, ast.ClassDef) and x.name != "Object"]
     functions = [x for x in nodes if isinstance(x, ast.FunctionDef)]
     commons = [x for x in nodes if x not in gg(classes) + gg(functions)]
+    commons += ast.parse("bytes = str").body
 
     for func in functions:
         func.decorator_list = [x for x in func.decorator_list if not isinstance(x, ast.Name)]
