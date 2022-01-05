@@ -1,7 +1,6 @@
 # Created by BaiJiFeiLong@gmail.com at 2022/1/4 15:27
 
 import ast
-import re
 
 import astor
 import html2text
@@ -63,26 +62,10 @@ def findDocInDict(dkt, name):
 
 
 gg = lambda x: x
-signalRegex = re.compile(r"^void (\w+)\(.*\)$")
-htmlDumper = html2text.HTML2Text()
-htmlDumper.ignore_links = True
-htmlDumper.ignore_emphasis = True
-htmlDumper.ignore_tables = True
-htmlDumper.body_width = 2 ** 31 - 1
-signalTemplate = """
-class Dummy(object):
-    @property
-    def signal(self) -> PySide2.QtCore.SignalInstance:
-        \"\"\"
-        **C++ Signature**: *signature*
-        \"\"\"
-        ...
-"""
 failed = []
-docXpath = "//h3/following-sibling::*[preceding-sibling::h3[1][{}] and not(self::h3)]"
 count = 0
 failures = []
-for moduleName in ["QtCore", "QtGui", "QtWidgets", "QtMultimedia"]:
+for moduleName in ["QtCore", "QtGui", "QtWidgets", "QtMultimedia"][:1]:
     print(f"Processing module {moduleName}...")
     text = Path(f"./venv/Lib/site-packages/PySide2/{moduleName}.pyi").read_text()
     tree: ast.Module = ast.parse(text)
@@ -114,13 +97,12 @@ for moduleName in ["QtCore", "QtGui", "QtWidgets", "QtMultimedia"]:
         else:
             html = (docRoot / basename).read_text(encoding="utf8")
         selector = Selector(html)
-        rows = selector.xpath("//h2[@id='signals']/following-sibling::div[1]//tr")
-        for row in rows:
-            signature = htmlDumper.handle(row.get()).strip()
-            name = signalRegex.match(signature).group(1)
-            print("\tSignal", name, "\t|\t", signature)
-            signalCode = signalTemplate.replace("signal", name).replace("signature", signature)
-            signalMethod = gg(ast.parse(signalCode).body[0]).body[0]
+        signalsXpath = "//h2[@id='signals']/following-sibling::div[1]//td[2]/b/a[1]/text()"
+        signalNames = [x.get() for x in selector.xpath(signalsXpath)]
+        signalTemplate = "@property\ndef {}(self) -> PySide2.QtCore.SignalInstance: ..."
+        for signalName in signalNames:
+            signalCode = signalTemplate.format(signalName)
+            signalMethod = ast.parse(signalCode).body[0]
             clazz.body.append(signalMethod)
         methods = [x for x in clazz.body if isinstance(x, ast.FunctionDef)]
         dkt = parseFunctions(selector)
