@@ -99,9 +99,8 @@ def main():
 
 
 def joinParagraphs(paragraphs, indentLevel):
-    text = f"\n\n{' ' * indentLevel * 4}".join(paragraphs)
-    text = f"\n{' ' * indentLevel * 4}{text}\n        "
-    return text
+    paragraphs = [f"\n".join([f"{' ' * indentLevel * 4}{y}" for y in x.splitlines()]) for x in paragraphs]
+    return "\n" + "\n\n".join(paragraphs) + f"\n{' ' * indentLevel * 4}"
 
 
 def initLogging():
