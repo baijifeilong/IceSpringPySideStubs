@@ -29,7 +29,7 @@ def main():
     stubRoot.mkdir(parents=True)
     (stubRoot / "__init__.pyi").touch()
 
-    for moduleName in ["QtCore", "QtGui", "QtWidgets", "QtMultimedia"][:1]:
+    for moduleName in ["QtCore", "QtGui", "QtWidgets", "QtMultimedia"][:]:
         logging.info("Processing module %s...", moduleName)
         (stubRoot / moduleName).mkdir()
         moduleText = Path(f"./venv/Lib/site-packages/PySide2/{moduleName}.pyi").read_text()
@@ -172,7 +172,6 @@ def parseFunctionDocuments(selector):
             text = text.replace("*>", "\\*>")
             assert text or x.xpath("name()").get() == "a"
             text and dkt[name]["documents"].append(text)
-    assert all(x["documents"] for x in dkt.values())
     return dkt
 
 
