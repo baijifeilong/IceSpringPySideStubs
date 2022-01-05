@@ -52,7 +52,11 @@ def main():
             if not (docRoot / basename).exists():
                 failedClasses.append(clazz.name)
                 continue
+
+            logging.info("Processing class document")
             selector = Selector((docRoot / basename).read_text(encoding="utf8"))
+            classDocuments = parseClassDocuments(selector)
+            clazz.body.insert(0, ast.Expr(value=ast.Str(s=joinParagraphs(classDocuments, 1))))
 
             logging.info("Processing signals")
             signalsXpath = "//h2[@id='signals']/following-sibling::div[1]//td[2]/b/a[1]/text()"
@@ -156,6 +160,13 @@ def parseFunctionDocuments(selector):
             text and dkt[name]["documents"].append(text)
     assert all(x["documents"] for x in dkt.values())
     return dkt
+
+
+def parseClassDocuments(selector):
+    xpath = '//div[@class="descr"]/*|//div[@class="descr"]/following-sibling::p[1]'
+    documents = [getSignatureParser().handle(x.get()).strip() for x in selector.xpath(xpath)]
+    assert documents
+    return documents
 
 
 def gg(x) -> typing.Any:
