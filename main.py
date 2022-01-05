@@ -161,7 +161,7 @@ def parseFunctionDocuments(selector):
         if tag == "h3":
             name = x.attrib["id"]
             signature = getSignatureParser().handle(x.get()).replace("###", "").strip()
-            signature = f"**{signature}**"
+            signature = f"**{signature}**".replace("`", "")
             dkt[name] = dict(
                 signature=signature,
                 documents=[]
