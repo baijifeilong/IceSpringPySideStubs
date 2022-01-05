@@ -122,6 +122,12 @@ def getDocumentParser() -> html2text.HTML2Text:
     lines[834] = ' ' * 16 + 'self.o("**")'
     assert "self.o" in lines[458]
     lines[458] = " " * 12 + 'self.o(title + "** ")'
+    assert "self.o" in lines[339]
+    lines[339] = " " * 16 + 'self.o("**")'
+    assert "self.inheader" in lines[341]
+    lines[341] = " " * 16 + 'self.inheader = False; self.o("**")'
+    assert "self.p()" in lines[336]
+    lines[336] = ""
     module = importlib.util.module_from_spec(spec)
     exec(compile("\n".join(lines), module.__spec__.origin, "exec"), module.__dict__)
     parser: html2text.HTML2Text = gg(module).HTML2Text()
@@ -164,7 +170,8 @@ def parseFunctionDocuments(selector):
 
 def parseClassDocuments(selector):
     xpath = '//div[@class="descr"]/*|//div[@class="descr"]/following-sibling::p[1]'
-    documents = [getSignatureParser().handle(x.get()).strip() for x in selector.xpath(xpath)]
+    documents = [
+        getDocumentParser().handle(x.get()).replace("also**", "also** ").strip() for x in selector.xpath(xpath)]
     assert documents
     return documents
 
