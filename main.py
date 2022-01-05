@@ -1,18 +1,103 @@
 # Created by BaiJiFeiLong@gmail.com at 2022/1/4 15:27
 
 import ast
+import logging
+import typing
 
 import astor
+import colorlog
 import html2text
+import pydash
 from parsel import Selector
 from pathlib3x import Path
 
-docRoot = Path("~/scoop/persist/zeal/docsets/Qt_5.docset/Contents/Resources/Documents/doc.qt.io/qt-5").expanduser()
-assert docRoot.exists()
-stubRoot = Path("target") / "PySide2Stubs" / "PySide2"
-stubRoot.rmtree(ignore_errors=True)
-stubRoot.mkdir(parents=True)
-(stubRoot / "__init__.pyi").touch()
+
+def main():
+    initLogging()
+    failedClasses = []
+    failedMethods = []
+    docRoot = Path("~/scoop/persist/zeal/docsets/Qt_5.docset/Contents/Resources/Documents/doc.qt.io/qt-5").expanduser()
+    stubRoot = Path("target") / "PySide2Stubs" / "PySide2"
+
+    assert docRoot.exists()
+    stubRoot.rmtree(ignore_errors=True)
+    stubRoot.mkdir(parents=True)
+    (stubRoot / "__init__.pyi").touch()
+
+    for moduleName in ["QtCore", "QtGui", "QtWidgets", "QtMultimedia"][:1]:
+        logging.info("Processing module %s...", moduleName)
+        (stubRoot / moduleName).mkdir()
+        moduleText = Path(f"./venv/Lib/site-packages/PySide2/{moduleName}.pyi").read_text()
+        moduleText = moduleText.replace("Shiboken.Object", "object")
+
+        statements = ast.parse(moduleText).body
+        classes = [x for x in statements if isinstance(x, ast.ClassDef) and x.name != "Object"]
+        functions = [x for x in statements if isinstance(x, ast.FunctionDef)]
+        headers = statementsToHeaders(statements)
+
+        for func in functions:
+            func.decorator_list = [x for x in func.decorator_list if not isinstance(x, ast.Name)]
+        functionsPyi = stubRoot / moduleName / "_functions.pyi"
+        functionsPyi.write_text(astor.to_source(ast.Module(body=headers + gg(functions))))
+
+        imports = [f"from ._functions import {x.name} as {x.name}" for x in functions]
+        for clazz in classes:
+            logging.info("Processing class %s.%s ...", moduleName, clazz.name)
+            imports.append(f"from ._{clazz.name} import {clazz.name} as {clazz.name}")
+            basename = clazz.name.lower().replace("::", "-").replace("_", "-") + ".html"
+            if not (docRoot / basename).exists():
+                failedClasses.append(clazz.name)
+                continue
+            html = (docRoot / basename).read_text(encoding="utf8")
+            selector = Selector(html)
+            signalsXpath = "//h2[@id='signals']/following-sibling::div[1]//td[2]/b/a[1]/text()"
+            signalNames = [x.get() for x in selector.xpath(signalsXpath)]
+            signalTemplate = "@property\ndef {}(self) -> PySide2.QtCore.SignalInstance: ..."
+            for signalName in signalNames:
+                signalCode = signalTemplate.format(signalName)
+                signalMethod = ast.parse(signalCode).body[0]
+                clazz.body.append(signalMethod)
+            methods = [x for x in clazz.body if isinstance(x, ast.FunctionDef)]
+            dkt = parseFunctions(selector)
+            for method in methods:
+                name = clazz.name if method.name == "__init__" else method.name
+                logging.info("\tProcessing function %s.%s.%s", moduleName, clazz.name, name)
+                possibleNames = calcPossibleNames(name)
+                validNames = [x for x in possibleNames if x in dkt]
+                if not validNames:
+                    logging.warning("\t\tNo document found for this method.")
+                    failedMethods.append(f"{clazz.name}.{name} {basename}")
+                    continue
+                paragraphs = dkt[validNames[0]]
+                paragraphs = [x for x in paragraphs if x]
+                logging.info("\t\tFound document with %d paragraphs", len(paragraphs))
+                method.body.insert(0, ast.Expr(value=ast.Str(s=joinParagraphs(paragraphs, 2))))
+
+        modulePyi = stubRoot / moduleName / "__init__.pyi"
+        modulePyi.write_text("\n".join(imports), encoding="utf8")
+        for clazz in classes:
+            classPyi = stubRoot / moduleName / f"_{clazz.name}.pyi"
+            classPyi.write_text(astor.to_source(ast.Module(body=headers + gg([clazz]))), encoding="utf8")
+
+    logging.info("Failed classes:")
+    for x in failedClasses:
+        logging.info("\t%s", x)
+    logging.info("Failed functions:")
+    for x in failedMethods:
+        logging.info("\t%s", x)
+
+
+def joinParagraphs(paragraphs, indentLevel):
+    text = f"\n\n{' ' * indentLevel * 4}".join(paragraphs)
+    text = f"\n{' ' * indentLevel * 4}{text}\n        "
+    return text
+
+
+def initLogging():
+    consoleLogPattern = "%(log_color)s%(asctime)s %(levelname)8s %(name)-16s %(message)s"
+    logging.getLogger().handlers = [logging.StreamHandler()]
+    logging.getLogger().handlers[0].setFormatter(colorlog.ColoredFormatter(consoleLogPattern))
+    logging.getLogger().setLevel(logging.DEBUG)
 
 
 def parseFunctions(selector):
@@ -29,107 +114,41 @@ def parseFunctions(selector):
             dkt[name] = []
         elif len(dkt):
             assert name
-            dkt[name].append(dumper.handle(x.get()).strip())
+            text = dumper.handle(x.get()).strip()
+            assert text or x.xpath("name()").get() == "a"
+            text and dkt[name].append(text)
+    assert all(dkt.values())
     return dkt
+
+
+def gg(x) -> typing.Any:
+    return x
+
+
+def calcPossibleNames(name):
+    names = [name, pydash.lower_first(pydash.trim_start(name, "set"))]
+    names = list(dict.fromkeys(names))
+    names = pydash.flatten([[x, f"{x}-prop", f"{x}-1"] for x in names])
+    return names
 
 
 def remove_prefix(text, prefix):
     if text.startswith(prefix):
         return text[len(prefix):]
-    return text  # or whatever
+    return text
 
 
 def uncapitalize(s):
     return s[:1].lower() + s[1:]
 
 
-def findDocInDict(dkt, name):
-    name2 = uncapitalize(remove_prefix(name, "set"))
-    for x in [name, name + "-prop", "name" + "-1", name2, name2 + "-prop"]:
-        if x in dkt:
-            return dkt[x]
-    return []
-
-
-def generateHeaders(nodes):
-    statements = nodes
+def statementsToHeaders(statements):
     statements = [x for x in statements if isinstance(x, ast.Import)]
     statements = [x for x in statements if x.names[0].name.startswith("PySide2")]
     statements = [ast.Import(names=[ast.alias(name="typing", asname=None)])] + statements
-    statements = statements + [ast.Assign(targets=[ast.Name(id="bytes")], value=ast.Name(id="str"))]
+    statements = statements + gg([ast.Assign(targets=[ast.Name(id="bytes")], value=ast.Name(id="str"))])
     return statements
 
 
-gg = lambda x: x
-failed = []
-count = 0
-failures = []
-for moduleName in ["QtCore", "QtGui", "QtWidgets", "QtMultimedia"][:1]:
-    print(f"Processing module {moduleName}...")
-    text = Path(f"./venv/Lib/site-packages/PySide2/{moduleName}.pyi").read_text()
-    text = text.replace("Shiboken.Object", "object")
-    tree: ast.Module = ast.parse(text)
-
-    nodes = ast.parse(text).body
-    classes = [x for x in nodes if isinstance(x, ast.ClassDef) and x.name != "Object"]
-    functions = [x for x in nodes if isinstance(x, ast.FunctionDef)]
-    commons = generateHeaders(nodes)
-
-    for func in functions:
-        func.decorator_list = [x for x in func.decorator_list if not isinstance(x, ast.Name)]
-
-    (stubRoot / moduleName).mkdir(exist_ok=True)
-    modulePyi = stubRoot / moduleName / "__init__.pyi"
-    functionsPyi = stubRoot / moduleName / "_functions.pyi"
-    functionsPyi.write_text(astor.to_source(ast.Module(body=commons + functions)))
-    imports = [f"from ._functions import {x.name} as {x.name}" for x in functions]
-
-    isEnum = lambda clz: all([isinstance(x, ast.AnnAssign) for x in clz.body])
-    for clazz in classes[:]:
-        print(f"\nProcessing class {moduleName}.{clazz.name} (enum={isEnum(clazz)})...")
-        path = stubRoot / moduleName / f"_{clazz.name}.pyi"
-        imports.append(f"from ._{clazz.name} import {clazz.name} as {clazz.name}")
-        basename = clazz.name.lower().replace("::", "-").replace("_", "-") + ".html"
-        if not (docRoot / basename).exists():
-            failed.append(clazz.name)
-            html = ""
-        else:
-            html = (docRoot / basename).read_text(encoding="utf8")
-        selector = Selector(html)
-        signalsXpath = "//h2[@id='signals']/following-sibling::div[1]//td[2]/b/a[1]/text()"
-        signalNames = [x.get() for x in selector.xpath(signalsXpath)]
-        signalTemplate = "@property\ndef {}(self) -> PySide2.QtCore.SignalInstance: ..."
-        for signalName in signalNames:
-            signalCode = signalTemplate.format(signalName)
-            signalMethod = ast.parse(signalCode).body[0]
-            clazz.body.append(signalMethod)
-        methods = [x for x in clazz.body if isinstance(x, ast.FunctionDef)]
-        dkt = parseFunctions(selector)
-        for method in methods:
-            name = clazz.name if method.name == "__init__" else method.name
-            print(f"\n\tFunction {clazz.name}.{name}")
-            doc = findDocInDict(dkt, name)
-            print("\n".join([f"\t\t{x}" for x in doc if x]))
-            if doc:
-                doc = "\n\n".join(doc)
-                method.body.insert(0, ast.Expr(value=ast.Str(
-                    s="\n" + "\n\n".join(f"        {x}" for x in doc.splitlines() if x) + "\n        ")))
-            if html:
-                if not doc:
-                    count += 1
-                    print(str(docRoot / basename))
-                    failures.append(f"{clazz.name}.{name} {basename}")
-                    if count >= 2500:
-                        print()
-                        for failure in failures:
-                            print(failure)
-        path.write_text(astor.to_source(ast.Module(body=commons + [clazz])), encoding="utf8")
-        # html and exit()
-    modulePyi.write_text("\n".join(imports), encoding="utf8")
-
-print("Failed:")
-for x in failed:
-    print("\t", x)
-print("\nFailures:")
-for x in failures:
-    print("\t", x)
+if __name__ == '__main__':
+    main()
