@@ -3,9 +3,12 @@
 import ast
 import importlib.util
 import logging
+import re
 import typing
 
 import astor
+import astunparse
+import black
 import cacheout
 import colorlog
 import html2text
@@ -88,11 +91,13 @@ def main():
                 documents = [signature] + paragraphs
                 method.body.insert(0, ast.Expr(value=ast.Str(s=joinParagraphs(documents, 2))))
 
+        logging.info("Writing module %s", moduleName)
         modulePyi = stubRoot / moduleName / "__init__.pyi"
-        modulePyi.write_text("\n".join(imports), encoding="utf8")
+        modulePyi.write_text(prettyCode("\n".join(imports)), "utf8")
         for clazz in classes:
+            logging.info("Writing class %s.%s ...", moduleName, clazz.name)
             classPyi = stubRoot / moduleName / f"_{clazz.name}.pyi"
-            classPyi.write_text(astor.to_source(ast.Module(body=headers + gg([clazz]))), encoding="utf8")
+            classPyi.write_text(prettyCode(astunparse.unparse(ast.Module(body=headers + gg([clazz])))), "utf8")
 
     logging.info("Failed classes:")
     for x in failedClasses:
@@ -112,6 +117,7 @@ def initLogging():
     logging.getLogger().handlers = [logging.StreamHandler()]
     logging.getLogger().handlers[0].setFormatter(colorlog.ColoredFormatter(consoleLogPattern))
     logging.getLogger().setLevel(logging.DEBUG)
+    logging.getLogger("blib2to3.pgen2.driver").setLevel(logging.INFO)
 
 
 @cacheout.memoize()
@@ -193,6 +199,14 @@ def parseModuleHeaders(statements):
     statements = [ast.Import(names=[ast.alias(name="typing", asname=None)])] + statements
     statements = statements + gg([ast.Assign(targets=[ast.Name(id="bytes")], value=ast.Name(id="str"))])
     return statements
+
+
+def prettyCode(code: str):
+    step1 = lambda x: re.sub(r"(^\s*)(['\"])(.+)(['\"])(\s*)$", r"\1\2\2\2\3\4\4\4\5", x)
+    step2 = lambda x: re.sub("(?<!\\\\)\\\\n", "\n", x)
+    code = "\n".join([step2(step1(x)) for x in code.splitlines()])
+    code = black.format_str(code, mode=black.Mode())
+    return code
 
 
 if __name__ == '__main__':
