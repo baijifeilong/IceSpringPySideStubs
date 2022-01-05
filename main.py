@@ -139,6 +139,7 @@ def getDocumentParser() -> html2text.HTML2Text:
     parser: html2text.HTML2Text = gg(module).HTML2Text()
     parser.ignore_tables = True
     parser.body_width = 2 ** 31 - 1
+    parser.emphasis_mark = "**"
     return parser
 
 
@@ -147,6 +148,7 @@ def getSignatureParser() -> html2text.HTML2Text:
     parser: html2text.HTML2Text = html2text.HTML2Text()
     parser.body_width = 2 ** 31 - 1
     parser.ignore_links = True
+    parser.emphasis_mark = ""
     return parser
 
 
