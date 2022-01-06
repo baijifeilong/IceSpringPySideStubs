@@ -41,7 +41,7 @@ Out of the box
 
 ## Build
 
-### Prerequisites:
+### Prerequisites
 
 Offline Qt document is required. If not, download one:
 
