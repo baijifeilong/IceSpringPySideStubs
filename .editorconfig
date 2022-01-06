@@ -17,3 +17,6 @@ ij_python_align_collections_and_comprehensions = false
 ij_python_use_continuation_indent_for_parameters = true
 ij_python_use_continuation_indent_for_arguments = false
 ij_python_use_continuation_indent_for_collection_and_comprehensions = false
+
+[*.md]
+max_line_length = 150
