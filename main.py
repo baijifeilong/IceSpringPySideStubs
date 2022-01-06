@@ -22,17 +22,17 @@ def main():
     failedClasses = []
     failedMethods = []
     docRoot = Path("~/scoop/persist/zeal/docsets/Qt_5.docset/Contents/Resources/Documents/doc.qt.io/qt-5").expanduser()
-    stubRoot = Path("target") / "PySide2Stubs" / "PySide2"
+    stubRoot = Path("target") / "PySide2Stubs" / "PySide2-stubs"
 
     assert docRoot.exists()
     stubRoot.rmtree(ignore_errors=True)
-    stubRoot.mkdir(parents=True)
+    stubRoot.mkdir(parents=True, exist_ok=True)
     (stubRoot / "__init__.pyi").touch()
 
     modulesNames = [x.stem for x in Path(f"./venv/Lib/site-packages/PySide2").glob("*.pyi")]
     for moduleName in modulesNames:
         logging.info("Processing module %s...", moduleName)
-        (stubRoot / moduleName).mkdir()
+        (stubRoot / moduleName).mkdir(exist_ok=True)
         moduleText = Path(f"./venv/Lib/site-packages/PySide2/{moduleName}.pyi").read_text()
         moduleText = moduleText.replace("Shiboken.Object", "object")
 
@@ -109,6 +109,7 @@ def main():
 
 
 def joinParagraphs(paragraphs, indentLevel):
+    paragraphs = [x for x in paragraphs if x.strip()]
     paragraphs = [f"\n".join([f"{' ' * indentLevel * 4}{y}" for y in x.splitlines()]) for x in paragraphs]
     return "\n" + "\n\n".join(paragraphs) + f"\n{' ' * indentLevel * 4}"
 
