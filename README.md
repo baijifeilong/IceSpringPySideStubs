@@ -18,6 +18,7 @@ Supported Qt versions now: PySide2 only.
 - Better performance: one class one file
 - More editable: one class one file
 - Clean: all codes are well formatted
+- Direct link to Official Qt site
 
 ## Known issues
 
@@ -60,7 +61,7 @@ Offline Qt document is required. If not, download one:
 
 ## Licence
 
-GPL-3
+GPLv3
 
 ## Example snippets
 
