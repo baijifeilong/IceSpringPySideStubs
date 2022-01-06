@@ -60,6 +60,8 @@ def main():
             logging.info("Processing class document")
             selector = Selector((docRoot / basename).read_text(encoding="utf8"))
             classDocuments = parseClassDocuments(selector)
+            classUrl = f"https://doc.qt.io/qt-5/{basename}"
+            classDocuments.insert(0, classUrl)
             clazz.body.insert(0, ast.Expr(value=ast.Str(s=joinParagraphs(classDocuments, 1))))
 
             logging.info("Processing signals")
@@ -84,12 +86,14 @@ def main():
                     logging.warning(f"{' ' * 8}No document found for this method.")
                     failedMethods.append(f"{clazz.name}.{name} {basename}")
                     continue
-                documentEntry = documentDict[validNames[0]]
+                methodId = validNames[0]
+                documentEntry = documentDict[methodId]
                 signature = documentEntry["signature"]
                 paragraphs = documentEntry["documents"]
                 logging.info(f"{' ' * 8}Signature: %s", signature)
                 logging.info(f"{' ' * 8}Found document with %d paragraphs", len(paragraphs))
                 documents = [signature] + paragraphs
+                documents.insert(0, f"{classUrl}#{methodId}")
                 method.body.insert(0, ast.Expr(value=ast.Str(s=joinParagraphs(documents, 2))))
 
         logging.info("Writing module %s", moduleName)

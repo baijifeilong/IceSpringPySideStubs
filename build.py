@@ -21,7 +21,7 @@ for command in ["sdist", "bdist_wheel"]:
         license='GPL3',
         author='BaiJiFeiLong',
         author_email='baijifeilong@gmail.com',
-        version='1.0.1',
+        version='1.0.2',
         description='PySide2 stubs with Qt signals and Qt documentations and more',
         packages=["PySide2-stubs"],
         package_data={"PySide2-stubs": ['*.pyi', '**/*.pyi']},
