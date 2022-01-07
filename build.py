@@ -42,7 +42,7 @@ def processBinding(binding: str):
             license='MIT',
             author='BaiJiFeiLong',
             author_email='baijifeilong@gmail.com',
-            version='1.3.0',
+            version='1.3.1',
             description=f'{binding} stubs with Qt signals and Qt documentations and more',
             packages=[f"{binding}-stubs"],
             package_data={f"{binding}-stubs": ['*.pyi', '**/*.pyi']},

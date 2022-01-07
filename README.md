@@ -1,6 +1,6 @@
 # IceSpringPySideStubs
 
-PySide/PyQt stubs with Qt signals and Qt documentations and more.
+PySide/PyQt stubs with Qt signals and Qt documents and more.
 
 Supported Qt bindings now: PySide2, PySide6, PyQt5, PyQt6.
 
@@ -15,14 +15,14 @@ Supported Qt bindings now: PySide2, PySide6, PyQt5, PyQt6.
 
 ## Features
 
-- Qt official documentations support
+- Qt official documents support
 - Qt signals support
 - More correct type annotations
 - Recognition of unknown method names
 - Better performance: one class one file
 - More editable: one class one file
 - Clean: all codes are well formatted
-- Direct link to Official Qt site
+- Direct link to the Official Qt site
 
 ## Known issues
 
@@ -47,10 +47,10 @@ Out of the box
 
 ### Prerequisites
 
-Offline Qt document is required. If not, download one:
+Offline Qt documents are required. If not, download them:
 
 1. Install [Zeal](https://zealdocs.org/). `scoop install zeal` for Windows users.
-2. Open `Zeal`, Download `Qt5` and `Qt6` document from `Docsets`
+2. Open `Zeal`, Download `Qt5` and `Qt6` from `Docsets`
 
 ### Build steps
 
@@ -63,7 +63,7 @@ Offline Qt document is required. If not, download one:
 7. `./venv/Scripts/python.exe build.py` Generate `.whl` package in `target` folder.
 8. `./venv/Scripts/pip.exe install __generated_whl_package__.whl` Install the `.whl` package
 
-## Licence
+## License
 
 MIT
 
@@ -330,7 +330,7 @@ class QObject(object):
         ...
 
 # More..........................................................................
-# Line..........................................................................
+# Lines.........................................................................
 # Here..........................................................................
 # Are...........................................................................
 # Omitted.......................................................................
