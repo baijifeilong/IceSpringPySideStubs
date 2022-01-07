@@ -9,6 +9,7 @@ import typing
 
 import astor
 import astunparse
+import autoflake
 import black
 import cacheout
 import colorlog
@@ -19,10 +20,20 @@ from pathlib3x import Path
 
 
 def main():
-    docRoot = Path("~/scoop/persist/zeal/docsets/Qt_5.docset/Contents/Resources/Documents/doc.qt.io/qt-5").expanduser()
-    stubRoot = Path("target") / "PySide2Stubs" / "PySide2-stubs"
-
     initLogging()
+    for binding in ["PySide2", "PySide6"][:]:
+        logging.info("Processing binding %s...", binding)
+        processBinding(binding)
+
+
+def processBinding(binding: str):
+    docFilenames = dict(
+        PySide2="~/scoop/persist/zeal/docsets/Qt_5.docset/Contents/Resources/Documents/doc.qt.io/qt-5",
+        PySide6="~/scoop/persist/zeal/docsets/Qt_6.docset/Contents/Resources/Documents/doc.qt.io/qt-6",
+    )
+    docRoot = Path(docFilenames[binding]).expanduser()
+    stubRoot = Path("target") / f"{binding}Stubs" / f"{binding}-stubs"
+
     assert docRoot.exists()
     stubRoot.rmtree(ignore_errors=True)
     stubRoot.mkdir(parents=True, exist_ok=True)
@@ -30,11 +41,12 @@ def main():
 
     failedClasses = []
     failedMethods = []
-    modulesNames = [x.stem for x in Path(f"./venv/Lib/site-packages/PySide2").glob("*.pyi")]
+    modulesNames = [x.stem for x in Path(f"./venv/Lib/site-packages/{binding}").glob("*.pyi")]
+    qtVersion = dict(PySide2=5, PySide6=6)[binding]
     for moduleName in modulesNames:
-        logging.info("Processing module %s...", moduleName)
+        logging.info("Processing module %s.%s...", binding, moduleName)
         (stubRoot / moduleName).mkdir(exist_ok=True)
-        moduleText = Path(f"./venv/Lib/site-packages/PySide2/{moduleName}.pyi").read_text()
+        moduleText = Path(f"./venv/Lib/site-packages/{binding}/{moduleName}.pyi").read_text()
         moduleText = moduleText.replace("Shiboken.Object", "object")
 
         statements = ast.parse(moduleText).body
@@ -51,7 +63,7 @@ def main():
 
         imports = [f"from ._functions import {x.name} as {x.name}" for x in functions]
         for clazz in classes:
-            logging.info("Processing class %s.%s ...", moduleName, clazz.name)
+            logging.info("Processing class %s.%s.%s ...", binding, moduleName, clazz.name)
             imports.append(f"from ._{clazz.name} import {clazz.name} as {clazz.name}")
             basename = clazz.name.lower().replace("::", "-").replace("_", "-") + ".html"
             if not (docRoot / basename).exists():
@@ -61,17 +73,17 @@ def main():
             logging.info("Processing class document")
             selector = Selector((docRoot / basename).read_text(encoding="utf8"))
             classDocuments = parseClassDocuments(selector)
-            classUrl = f"https://doc.qt.io/qt-5/{basename}"
+            classUrl = f"https://doc.qt.io/qt-{qtVersion}/{basename}"
             classDocuments.insert(0, classUrl)
             clazz.body.insert(0, ast.Expr(value=ast.Str(s=joinParagraphs(classDocuments, 1))))
 
             logging.info("Processing signals")
             signalsXpath = "//h2[@id='signals']/following-sibling::div[1]//td[2]/b/a[1]/text()"
             signalNames = [x.get() for x in selector.xpath(signalsXpath)]
-            signalTemplate = "@property\ndef {}(self) -> PySide2.QtCore.SignalInstance: ..."
+            signalTemplate = "@property\ndef {}(self) -> {}.QtCore.SignalInstance: ..."
             for signalName in signalNames:
                 logging.info(f"{' ' * 4}Processing signal: %s.%s.%s", moduleName, clazz.name, signalName)
-                signalCode = signalTemplate.format(signalName)
+                signalCode = signalTemplate.format(signalName, binding)
                 signalMethod = ast.parse(signalCode).body[0]
                 clazz.body.append(signalMethod)
 
@@ -83,12 +95,13 @@ def main():
                 name = clazz.name if method.name == "__init__" else method.name
                 logging.info(f"{' ' * 4}Processing method %s.%s.%s", moduleName, clazz.name, name)
                 possibleNames = calcPossibleNames(name)
-                validNames = [x for x in possibleNames if x in documentDict and x not in usedNames]
+                validNames = [x for x in possibleNames if x in documentDict]
                 if not validNames:
                     logging.warning(f"{' ' * 8}No document found for this method.")
                     failedMethods.append(f"{clazz.name}.{name} {basename}")
                     continue
-                methodId = validNames[0]
+                unusedValidNames = [x for x in validNames if x not in usedNames]
+                methodId = (unusedValidNames or validNames)[0]
                 usedNames.append(methodId)
                 documentEntry = documentDict[methodId]
                 signature = documentEntry["signature"]
@@ -99,11 +112,11 @@ def main():
                 documents.insert(0, f"{classUrl}#{methodId}")
                 method.body.insert(0, ast.Expr(value=ast.Str(s=joinParagraphs(documents, 2))))
 
-        logging.info("Writing module %s", moduleName)
+        logging.info("Writing module %s.%s", binding, moduleName)
         modulePyi = stubRoot / moduleName / "__init__.pyi"
         modulePyi.write_text(prettyCode("\n".join(imports)), "utf8")
         for clazz in classes:
-            logging.info("Writing class %s.%s ...", moduleName, clazz.name)
+            logging.info("Writing class %s.%s.%s ...", binding, moduleName, clazz.name)
             classPyi = stubRoot / moduleName / f"_{clazz.name}.pyi"
             classPyi.write_text(prettyCode(astunparse.unparse(ast.Module(body=headers + gg([clazz])))), "utf8")
 
@@ -193,20 +206,25 @@ def gg(x) -> typing.Any:
 
 
 def calcPossibleNames(name):
-    names = list(dict.fromkeys([name, pydash.lower_first(pydash.trim_start(name, "set"))]))
+    names = list(dict.fromkeys([name, pydash.lower_first(pydash.trim_start(name, "set")), pydash.trim_end(name, "_")]))
     names = pydash.flatten_deep([[x, f"{x}-prop", [f"{x}-{y + 1}" for y in range(10)]] for x in names])
     return names
 
 
 def parseModuleHeaders(statements):
-    statements = [x for x in statements if isinstance(x, ast.Import)]
-    statements = [x for x in statements if x.names[0].name.startswith("PySide2")]
-    statements = [ast.Import(names=[ast.alias(name="typing", asname=None)])] + statements
+    statements = [x.body[0] if isinstance(x, ast.Try) else x for x in statements]
+    statements = [x for x in statements if isinstance(x, (ast.Import, ast.ImportFrom))]
+    statements = [x for x in statements if "shiboken" not in astor.to_source(x).lower()]
+    statements = [x for x in statements if "PySide2.support.signature" not in astor.to_source(x)]
+    for statement in statements:
+        if isinstance(statement, ast.ImportFrom) and statement.module == "typing":
+            statement.names.append(ast.alias(name="Iterable", asname=None))
     statements = statements + gg([ast.Assign(targets=[ast.Name(id="bytes")], value=ast.Name(id="str"))])
     return statements
 
 
 def prettyCode(code: str):
+    code = autoflake.fix_code(code)
     step1 = lambda x: re.sub(r"(^\s*)(['\"])(.+)(['\"])(\s*)$", r"\1\2\2\2\3\4\4\4\5", x)
     step2 = lambda x: re.sub("(?<!\\\\)\\\\n", "\n", x)
     code = "\n".join([step2(step1(x)) for x in code.splitlines()])
@@ -216,6 +234,7 @@ def prettyCode(code: str):
         "Home: https://baijifeilong.github.io/2022/01/06/ice-spring-pyside-stubs/index.html",
         "Github: https://github.com/baijifeilong/IceSpringPySideStubs",
         "PyPI(PySide2): https://pypi.org/project/IceSpringPySideStubs-PySide2",
+        "PyPI(PySide6): https://pypi.org/project/IceSpringPySideStubs-PySide6",
         "Generated by BaiJiFeiLong@gmail.com",
         "Licence: GPLv3"
     ]), '"""']) + "\n" + code
