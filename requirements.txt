@@ -8,7 +8,6 @@ html2text==2020.1.16
 parsel==1.6.0
 pydash==5.1.0
 cacheout==0.13.1
-astunparse==1.6.3
 black==21.12b0
 autoflake==1.4
 

@@ -11,7 +11,7 @@ from pathlib3x import Path
 
 def main():
     initLogging()
-    for binding in ["PySide2", "PySide6"]:
+    for binding in ["PySide2", "PySide6", "PyQt5"]:
         logging.info("Building for binding %s...", binding)
         processBinding(binding)
     logging.info("Generated files:")
@@ -42,7 +42,7 @@ def processBinding(binding: str):
             license='GPLv3',
             author='BaiJiFeiLong',
             author_email='baijifeilong@gmail.com',
-            version='1.1.0',
+            version='1.2.0',
             description=f'{binding} stubs with Qt signals and Qt documentations and more',
             packages=[f"{binding}-stubs"],
             package_data={f"{binding}-stubs": ['*.pyi', '**/*.pyi']},
