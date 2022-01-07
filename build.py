@@ -12,7 +12,7 @@ for path in Path(".").glob("*"):
         path.rmtree()
 
 readme = Path("../../README.md").read_text(encoding="utf8")
-distutils.log.set_verbosity(0)
+distutils.log.set_verbosity(1)
 for command in ["sdist", "bdist_wheel"]:
     setuptools.dist.Distribution(attrs=dict(
         script_name="",
@@ -21,7 +21,7 @@ for command in ["sdist", "bdist_wheel"]:
         license='GPLv3',
         author='BaiJiFeiLong',
         author_email='baijifeilong@gmail.com',
-        version='1.0.7',
+        version='1.0.8',
         description='PySide2 stubs with Qt signals and Qt documentations and more',
         packages=["PySide2-stubs"],
         package_data={"PySide2-stubs": ['*.pyi', '**/*.pyi']},

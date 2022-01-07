@@ -4,11 +4,11 @@ PySide stubs with Qt signals and Qt documentations and more.
 
 Supported Qt versions now: PySide2 only.
 
-## Official sites:
+## Official sites
 
 - Home: [https://baijifeilong.github.io/2022/01/06/ice-spring-pyside-stubs/index.html](https://baijifeilong.github.io/2022/01/06/ice-spring-pyside-stubs/index.html)
 - Github: [https://github.com/baijifeilong/IceSpringPySideStubs](https://github.com/baijifeilong/IceSpringPySideStubs)
-- Pypi(PySide2): [https://pypi.org/project/IceSpringPySideStubs-PySide2](https://pypi.org/project/IceSpringPySideStubs-PySide2)
+- PyPI(PySide2): [https://pypi.org/project/IceSpringPySideStubs-PySide2](https://pypi.org/project/IceSpringPySideStubs-PySide2)
 
 ## Features
 
