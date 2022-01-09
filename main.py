@@ -17,8 +17,8 @@ import colorlog
 import html2text
 import psutil
 import pydash
+from IceSpringPathLib import Path
 from parsel import Selector
-from pathlib3x import Path
 
 
 def main():
@@ -94,7 +94,7 @@ def processBinding(binding: str):
                 continue
 
             logging.info("Processing class document")
-            selector = Selector((docRoot / basename).read_text(encoding="utf8"))
+            selector = Selector((docRoot / basename).read_text())
             classDocuments = parseClassDocuments(selector)
             classUrl = f"https://doc.qt.io/qt-{qtVersion}/{basename}"
             classDocuments.insert(0, classUrl)
@@ -139,12 +139,12 @@ def processBinding(binding: str):
 
         logging.info("Writing module %s.%s", binding, moduleName)
         modulePyi = stubRoot / moduleName / "__init__.pyi"
-        modulePyi.write_text(prettyCode("\n".join(imports), keepImports=True), "utf8")
+        modulePyi.write_text(prettyCode("\n".join(imports), keepImports=True))
         for clazz in classes:
             logging.info("Writing class %s.%s.%s ...", binding, moduleName, clazz.name)
             classPyi = stubRoot / moduleName / f"_{clazz.name}.pyi"
             classPyi.write_text(prettyCode(astor.to_source(ast.Module(body=headers + gg([clazz])),
-                pretty_source=lambda x: "".join(x))), "utf8")
+                pretty_source=lambda x: "".join(x))))
 
     logging.info("Failed classes:")
     for x in failedClasses:

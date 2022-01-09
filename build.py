@@ -6,7 +6,7 @@ import os
 
 import colorlog
 import setuptools.dist
-from pathlib3x import Path
+from IceSpringPathLib import Path
 
 
 def main():
@@ -27,7 +27,7 @@ def initLogging():
 
 
 def processBinding(binding: str):
-    readme = Path("README.md").read_text(encoding="utf8")
+    readme = Path("README.md").read_text()
     os.chdir(f"target/{binding}Stubs")
     for path in Path().glob("*"):
         if not path.stem.endswith("-stubs"):
